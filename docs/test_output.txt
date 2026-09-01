@@ -1,0 +1,37 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.3.2, pluggy-1.6.0 -- C:\Users\Manas\Downloads\Total Job Application process flow\projects\experiment-readout-guardrail-harness\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Manas\Downloads\Total Job Application process flow\projects\experiment-readout-guardrail-harness
+configfile: pyproject.toml
+collecting ... collected 28 items
+
+tests/test_cuped.py::test_cuped_adjustment_uncorrelated_with_covariate PASSED [  3%]
+tests/test_cuped.py::test_cuped_never_increases_variance PASSED          [  7%]
+tests/test_cuped.py::test_measured_reduction_matches_rho_squared_formula PASSED [ 10%]
+tests/test_cuped.py::test_required_sample_size_scalar_oracle PASSED      [ 14%]
+tests/test_cuped.py::test_zero_correlation_gives_zero_reduction PASSED   [ 17%]
+tests/test_cuped.py::test_sample_size_reduction_end_to_end_runs PASSED   [ 21%]
+tests/test_dgp.py::test_zero_inflated_mass PASSED                        [ 25%]
+tests/test_dgp.py::test_heavy_tailed_not_gaussian PASSED                 [ 28%]
+tests/test_dgp.py::test_top_1_percent_share_of_revenue_is_large PASSED   [ 32%]
+tests/test_dgp.py::test_theoretical_moments_match_empirical PASSED       [ 35%]
+tests/test_dgp.py::test_shared_latent_z_creates_correlation PASSED       [ 39%]
+tests/test_guardrail.py::test_blocks_when_guardrail_regressed_despite_great_primary PASSED [ 42%]
+tests/test_guardrail.py::test_ships_when_primary_significant_and_guardrails_clean PASSED [ 46%]
+tests/test_guardrail.py::test_holds_when_primary_not_significant_and_guardrails_clean PASSED [ 50%]
+tests/test_guardrail.py::test_watch_not_block_for_non_significant_regression PASSED [ 53%]
+tests/test_guardrail.py::test_guardrail_improving_never_blocks PASSED    [ 57%]
+tests/test_guardrail.py::test_higher_is_better_guardrail_blocks_on_a_drop PASSED [ 60%]
+tests/test_guardrail.py::test_never_ships_with_blocked_guardrail PASSED  [ 64%]
+tests/test_guardrail.py::test_unknown_guardrail_name_raises PASSED       [ 67%]
+tests/test_msprt.py::test_mixture_lr_vectorized_matches_scalar_oracle PASSED [ 71%]
+tests/test_msprt.py::test_mixture_lr_equals_one_at_zero_difference PASSED [ 75%]
+tests/test_msprt.py::test_msprt_fpr_never_exceeds_theoretical_bound_by_more_than_noise PASSED [ 78%]
+tests/test_msprt.py::test_msprt_controls_fpr_far_better_than_naive_peeking_on_same_data PASSED [ 82%]
+tests/test_peeking.py::test_look_schedule_reaches_full_n_and_is_increasing PASSED [ 85%]
+tests/test_peeking.py::test_welch_p_values_matches_scipy_scalar_oracle PASSED [ 89%]
+tests/test_peeking.py::test_single_look_null_fpr_close_to_nominal_alpha PASSED [ 92%]
+tests/test_peeking.py::test_peeking_inflates_fpr_above_single_look PASSED [ 96%]
+tests/test_peeking.py::test_more_looks_inflate_fpr_further PASSED        [100%]
+
+============================= 28 passed in 11.90s =============================
