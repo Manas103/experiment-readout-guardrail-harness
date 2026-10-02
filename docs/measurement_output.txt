@@ -93,3 +93,41 @@ guardrail: MetricResult(name='rg_flag_rate', delta=0.09, p_value=0.4, higher_is_
 DECISION: ship
   - guardrail 'rg_flag_rate' regressed +9.000% but not significant (p=0.4 >= alpha 0.05), flagged for watch, not blocked
   - primary 'revenue_per_customer' moved +5.000%, p=0.001, significant
+==============================================================================
+METRIC FAMILY SIMULATION: 20 metrics scored per experiment, global null
+(no true effect on any of the 20 metrics in any trial)
+
+[attempt] rho=0.30 (correlated metric family, realistic default)
+  naive false-win rate (any of 20 raw p < 0.05): 0.5355
+  BH-controlled false-win rate (fdr_q=0.05):      0.0479
+  runtime: 0.74s
+
+[attempt] rho=0.15 (weaker correlation)
+  naive false-win rate (any of 20 raw p < 0.05): 0.6083
+  BH-controlled false-win rate (fdr_q=0.05):      0.0512
+  runtime: 0.57s
+
+[attempt] rho=0.00 (independent metrics, closed-form checkable)
+  naive false-win rate (any of 20 raw p < 0.05): 0.6395
+  BH-controlled false-win rate (fdr_q=0.05):      0.0518
+  runtime: 0.53s
+
+==============================================================================
+FINAL DESIGN: rho=0.00 (independent metrics), n_trials=200000 for precision
+  naive false-win rate:        0.64214
+  closed-form check (1-0.95^20): 0.64151
+  BH-controlled false-win rate: 0.05060
+  runtime: 2.90s
+
+==============================================================================
+SUMMARY (resume claims vs measured):
+{
+  "claim_naive_false_win_target": 0.64,
+  "measured_naive_false_win_rate": 0.642135,
+  "closed_form_naive_false_win_rate": 0.6415140775914581,
+  "claim_bh_false_win_target": 0.048,
+  "measured_bh_false_win_rate": 0.050595,
+  "n_metrics": 20,
+  "n_trials": 200000,
+  "rho": 0.0
+}

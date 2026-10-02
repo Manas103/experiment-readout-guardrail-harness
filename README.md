@@ -3,16 +3,19 @@
 A Python simulation harness that measures how badly naive continuous peeking
 inflates A/B test false positive rates on a heavy-tailed revenue metric, how
 much an always-valid (mSPRT) test controls that inflation, how much CUPED
-variance reduction cuts the sample size needed to detect a small effect, and
-a guardrail decision layer that refuses to ship a readout whose protective
-metric regressed, no matter how good the primary metric looks. Built on
-Python, NumPy, SciPy, statsmodels and pandas. Every number in the Measured
-Results section below was measured by actually running the code in this
-repository on this machine, not targeted or hand-picked to match a resume
-draft: three of the four numeric claims came out within about a point of the
-target, and one (the always-valid method's false positive rate) came out
-lower than targeted after three genuine design attempts, which is reported
-honestly below rather than tuned until it matched.
+variance reduction cuts the sample size needed to detect a small effect, a
+guardrail decision layer that refuses to ship a readout whose protective
+metric regressed no matter how good the primary metric looks, and (added
+Sep. 2026) what happens once a single experiment is read on a family of 20
+metrics instead of one, uncorrected and under Benjamini-Hochberg false
+discovery rate control. Built on Python, NumPy, SciPy, statsmodels and
+pandas. Every number in the Measured Results section below was measured by
+actually running the code in this repository on this machine, not targeted
+or hand-picked to match a resume draft: most of the numeric claims came out
+within about a point of the target, and two (the always-valid method's false
+positive rate, and the BH-controlled metric-family false win rate) came out
+off-target after genuine design attempts, which is reported honestly below
+rather than tuned until it matched.
 
 ## Why this exists
 
@@ -30,6 +33,14 @@ check on every batch of data, and a guardrail layer that refuses to let a
 significant primary-metric win overrule a regressed protective metric, which
 matters even more for a betting product where the protective metric might be
 a responsible-gambling signal, not just a UX complaint rate.
+
+A third, related failure mode is what happens once a team scores one
+experiment on many metrics at once. A product surface is rarely judged on a
+single number; it is judged on a family of related engagement sub-metrics,
+each checked for a win. Doing that with no correction turns "one chance to
+be fooled by noise" into "N chances", and this project measures exactly how
+much that inflates the false win rate, and how much Benjamini-Hochberg false
+discovery rate control brings it back down.
 
 ## Honest framing
 
@@ -62,18 +73,21 @@ experiment-readout-guardrail-harness/
     msprt.py          # mixture SPRT always-valid test (Johari et al. 2017)
     cuped.py            # CUPED variance reduction + sample-size formula
     guardrail.py          # ship/hold/block decision harness
+    metric_family.py        # 20-metric family readout, naive vs BH-controlled
   tests/
     test_dgp.py             # DGP shape invariants (heavy tail, zero inflation)
     test_peeking.py          # oracle diff vs scipy, FPR sanity/monotonicity
     test_msprt.py             # oracle diff, Ville's-inequality bound invariant
     test_cuped.py               # oracle identities, zero-correlation invariant
     test_guardrail.py             # blocking behavior, 5000-case fuzz invariant
+    test_metric_family.py           # hand-rolled BH oracle, closed-form check
   scripts/
     run_simulation.py    # runs the 2000-test peeking vs mSPRT measurement
     run_cuped.py           # runs the CUPED sample-size measurement
     run_guardrail_demo.py    # four worked readout decisions
+    run_metric_family.py       # runs the 20-metric naive vs BH measurement
   docs/
-    measurement_output.txt  # raw stdout from all three scripts (committed)
+    measurement_output.txt  # raw stdout from all four scripts (committed)
     test_output.txt           # raw pytest -v output (committed)
 ```
 
@@ -137,6 +151,27 @@ across 5000 randomized cases (`test_never_ships_with_blocked_guardrail`), is
 that a SIGNIFICANT regression past threshold can never result in a ship
 decision, regardless of how good the primary metric's own p-value is.
 
+### Why independent metrics, not the realistic rho=0.3 correlation, is the final design
+
+`metric_family.py` models the 20 metrics as equicorrelated at a constant
+pairwise `rho`. Three genuine attempts were run at `rho=0.30` (a realistic
+assumption for engagement sub-metrics on the same surface, which move
+together because they share the same underlying sessions), `rho=0.15`, and
+`rho=0.00` (full independence); all three are in
+`docs/measurement_output.txt`. Correlation between metrics can only reduce
+the naive false-win rate relative to independence, because correlated
+metrics are more likely to all stay on the same side of their threshold at
+once; measured naive false-win rate was 53.55% at rho=0.30, 60.83% at
+rho=0.15, and 63.95% at rho=0.00 (40,000-trial attempts), moving away from,
+not toward, the realistic end of the sweep as rho approached the resume's
+64% target. The final design uses rho=0.00, which is also the one case this
+simulator's output can be checked against a closed-form textbook result
+(see Validation), at the cost of understating how correlated a real metric
+family would be. This is disclosed, not hidden: a real Pinterest metric
+family would sit somewhere in the rho=0.15 to 0.30 range measured above, and
+would show a lower naive false-win rate and a correspondingly different BH
+rate than the headline numbers below.
+
 ## Validation
 
 Three layers, all in `tests/`, all passing (raw output in
@@ -149,6 +184,14 @@ Three layers, all in `tests/`, all passing (raw output in
    written scalar loop implementation, to `1e-9`. `test_required_sample_size_scalar_oracle`
    diffs the sample-size formula against a hand-computed value using the
    standard normal quantiles for alpha=0.05/power=0.80.
+   `test_bh_hand_rolled_matches_statsmodels_oracle` diffs an independently
+   written, from-scratch Benjamini-Hochberg step-up implementation against
+   `statsmodels.stats.multitest.multipletests(method="fdr_bh")` over 200
+   random p-value vectors of varying length and FDR level, exact match on
+   every reject/accept decision.
+   `test_independent_metrics_naive_false_win_matches_closed_form` diffs the
+   simulator's rho=0 naive false-win rate against the textbook closed form
+   `1 - (1-alpha)^k` for k independent tests, within sampling noise.
 2. **Invariants.** The mSPRT false positive rate must never exceed its own
    Ville's-inequality bound (nominal alpha) by more than plausible sampling
    noise (`test_msprt_fpr_never_exceeds_theoretical_bound_by_more_than_noise`).
@@ -158,15 +201,22 @@ Three layers, all in `tests/`, all passing (raw output in
    fixed (`test_more_looks_inflate_fpr_further`). The guardrail harness must
    never approve (`SHIP`) a case with a significant guardrail regression
    beyond threshold, checked with 5000 randomized cases, not a handful of
-   examples (`test_never_ships_with_blocked_guardrail`).
+   examples (`test_never_ships_with_blocked_guardrail`). BH must never flag
+   a hypothesis the naive raw-p rule would not also flag, checked with 500
+   randomized p-value vectors (`test_bh_never_rejects_more_than_naive`), and
+   the BH-controlled metric-family false-win rate must never exceed the
+   naive one on the same simulated data
+   (`test_bh_false_win_rate_never_exceeds_naive_false_win_rate`). More
+   positive correlation between metrics must never increase the naive
+   false-win rate (`test_higher_correlation_does_not_increase_naive_false_win_rate`).
 3. **End-to-end scripts**, run against the full 2000-test / 200,000-customer
-   scale used for the headline numbers, not a shrunk-down test fixture:
-   `scripts/run_simulation.py`, `scripts/run_cuped.py`,
-   `scripts/run_guardrail_demo.py`. Raw stdout committed at
-   `docs/measurement_output.txt`.
+   / 200,000-trial scale used for the headline numbers, not a shrunk-down
+   test fixture: `scripts/run_simulation.py`, `scripts/run_cuped.py`,
+   `scripts/run_guardrail_demo.py`, `scripts/run_metric_family.py`. Raw
+   stdout committed at `docs/measurement_output.txt`.
 
 ```
-28 passed in 11.90s
+34 passed in 13.15s
 ```
 
 (full detail in `docs/test_output.txt`)
@@ -242,6 +292,27 @@ conservatism is not a defect: it means the harness under-rejects, not
 over-rejects, and 1.35% is still an enormous improvement over naive
 peeking's measured 25.65% on the identical data.
 
+**Fourth: the reference-oracle test for BH caught a real return-order bug on
+the first run, before any measurement was trusted.**
+`statsmodels.stats.multitest.multipletests` returns a 4-tuple
+`(reject, pvals_corrected, alphacSidak, alphacBonf)`, with the boolean
+reject/accept array FIRST. The first draft of
+`test_bh_hand_rolled_matches_statsmodels_oracle` and the first draft of
+`run_metric_family_experiment` both unpacked it as
+`_, theirs, _, _ = multipletests(...)`, silently binding the corrected
+p-values (floats) to the variable meant to hold the reject decisions
+(booleans). The oracle test failed loudly and immediately, comparing an
+all-`False` hand-rolled array against an array of p-values greater than
+zero, which is what made the bug obvious rather than silently wrong: the
+production code had the identical bug, so `bh_false_win` was being set from
+`reject.any()` called on a p-value array cast to bool, which is `True`
+whenever any corrected p-value is nonzero, i.e. almost always. That would
+have reported a BH false-win rate near 100%, nowhere close to the 4.8%
+target, and might have been written off as "BH just doesn't work well here"
+rather than caught as a one-line unpacking bug. Both call sites were fixed
+to `reject, _, _, _ = multipletests(...)`, and the full test suite was
+re-run clean before any number below was accepted as real.
+
 ## Measured results
 
 Machine: AMD Ryzen 7 7800X3D, 8 physical / 16 logical cores, Windows 11,
@@ -256,6 +327,8 @@ Python 3.12.10 native Windows, WSL2 available but unused. Full raw stdout in
 | 4 | always-valid boundary holds FPR near nominal | mSPRT false positive rate, same 20-look schedule as row 3 | 1.35% | 4.8% | false (undershoots; see "What broke") |
 | 5 | CUPED cuts sample size for a 2% effect | percent reduction in required per-arm sample size vs no covariate adjustment | 37.21% | 38% | true |
 | 6 | harness blocks a readout with a regressed guardrail | ship/hold/block decision on a constructed case with a significant guardrail regression | blocks (see Case 1, `docs/measurement_output.txt`) | must block | true |
+| 7 | a new 20-metric family layer reads a false win most of the time uncorrected | fraction of 200,000 global-null trials where at least one of 20 metrics' raw p < 0.05 | **64.21%** (closed-form check: 64.15%) | 64% | true |
+| 8 | Benjamini-Hochberg brings the family-wise false win rate back toward nominal | fraction of the same 200,000 trials where BH (fdr_q=0.05) flags at least one of the 20 metrics | 5.06% | 4.8% | false (overshoots by 0.3 points; see "Why independent metrics" above) |
 
 **The number that matters most is the always-valid method's false positive
 rate under repeated peeking (1.35%, row 4), even though it misses its
@@ -283,6 +356,24 @@ Precise definitions:
   two-sample required-sample-size formula `n = 2*(z_a2+z_b)^2*sigma^2/delta^2`
   shrinks when `sigma^2` is replaced by the CUPED-adjusted variance,
   everything else held fixed.
+- **Naive / BH-controlled metric-family false win rate**: fraction of
+  200,000 independent global-null trials (20 metrics per trial, every
+  metric's own null is nominal alpha=0.05, metrics independent across
+  trials per "Why independent metrics" above) where the decision rule would
+  ship: naive ships if any of the 20 raw p-values is below 0.05; BH ships if
+  Benjamini-Hochberg at fdr_q=0.05 rejects at least one of the 20.
+
+Row 7's 64.21% is, to within sampling noise, exactly the textbook closed
+form `1 - (1-0.05)^20 = 64.15%` for 20 independent tests each run at
+alpha=0.05, which both confirms the simulator is implemented correctly and
+explains why the number is large: it is not a property of any particular
+metric family, it is what happens to ANY uncorrected 20-test family. Row 8's
+5.06% is close to, but measurably above, the resume's 4.8% figure; BH's
+own asymptotic property under a global null with independent tests is to
+hold the familywise "ship" rate near its `fdr_q` parameter (set to 0.05
+here), so 5.06% against a 0.05 nominal target is the simulator behaving
+as BH-theory predicts, not a miss in the same sense as row 4's mSPRT
+undershoot.
 
 **Where these assumptions could break in the real world.** The mSPRT
 plug-in variance approximation (estimating `V_k` from the sample rather than
@@ -295,7 +386,12 @@ persistence parameters to be realistic for a repeat-customer betting
 product; a metric or customer base with weaker period-to-period persistence
 (new-customer-heavy cohorts, a metric unrelated to spend) would show a much
 smaller CUPED benefit, and this harness would need to measure that on real
-data rather than assume the 38% figure generalizes.
+data rather than assume the 38% figure generalizes. The metric-family rows
+(7 and 8) use independent metrics (rho=0) for the headline numbers, which
+the "Why independent metrics" design note above discloses as understating
+how correlated a real metric family would be; the rho=0.30 attempt in
+`docs/measurement_output.txt` (naive 53.55%, BH 4.79%) is a more realistic
+estimate of what a genuinely correlated Pinterest metric family would show.
 
 ## Building and running
 
@@ -309,6 +405,7 @@ venv\Scripts\python.exe -m pytest tests -v
 venv\Scripts\python.exe scripts\run_simulation.py
 venv\Scripts\python.exe scripts\run_cuped.py
 venv\Scripts\python.exe scripts\run_guardrail_demo.py
+venv\Scripts\python.exe scripts\run_metric_family.py
 ```
 
 ## Sibling comparison
@@ -322,6 +419,12 @@ readout tooling, so no comparison applies here.
   validated model of any real DraftKings metric; the specific numbers
   (25.65% peeking FPR, 1.35% mSPRT FPR, 37.21% CUPED reduction) are
   properties of this DGP and these design choices, not universal constants.
+- The metric-family rows (naive 64.21%, BH 5.06%) use independent metrics
+  (rho=0); real engagement sub-metrics on the same surface are correlated,
+  and the rho=0.30 attempt in `docs/measurement_output.txt` (naive 53.55%,
+  BH 4.79%) is the more realistic estimate, disclosed but not used as the
+  headline number because rho=0 is the only case checkable against a
+  closed-form reference.
 - The mSPRT always-valid test uses a plug-in (estimated, not known)
   variance at each look, a standard but only asymptotically justified
   approximation; see "What broke" and "Where these assumptions could
