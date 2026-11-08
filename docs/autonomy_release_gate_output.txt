@@ -1,0 +1,21 @@
+Metric family: 24 metrics x 6 geofences = 144 slices
+Seeded shifts: 30
+
+Attempt 1 (shift_multiplier=1.35, exposure=200,000 mi, seed=2026090101): BH caught 9/30 (FDR 10.0%), fixed-threshold caught 26/30 (false-alarm rate 21.9%)
+Attempt 2 (shift_multiplier=1.60, exposure=200,000 mi, seed=2026090102): BH caught 15/30 (FDR 0.0%), fixed-threshold caught 27/30 (false-alarm rate 16.7%)
+Attempt 3 (shift_multiplier=1.60, exposure=500,000 mi, seed=2026090103): BH caught 21/30 (FDR 4.5%), fixed-threshold caught 28/30 (false-alarm rate 17.5%)
+
+Final (3rd) attempt, the one reported in the README:
+
+Versioned metrics mart summary, by family (DuckDB SQL):
+  comfort          slices= 48 seeded= 9 baseline_events=48360 candidate_events=54061
+  disengagement    slices= 48 seeded=12 baseline_events=8372 candidate_events=9803
+  safety_critical  slices= 48 seeded= 9 baseline_events= 427 candidate_events= 495
+
+Benjamini-Hochberg across the full 144-slice family (fdr_q=0.05):
+  caught 21 of 30 seeded shifts (70.0%)
+  false discovery rate: 4.5% (22 total flags)
+
+Fixed per-slice relative threshold (15%), no significance test:
+  caught 28 of 30 seeded shifts (93.3%)
+  false alarm rate on null slices: 17.5% (48 total flags)

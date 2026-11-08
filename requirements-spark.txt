@@ -1,0 +1,11 @@
+# Only needed for scripts/run_metrics_mart_spark.py and
+# tests/test_metrics_mart_spark.py, and only installable into a WSL2
+# Linux venv on this machine (see README "Honest framing": local PySpark
+# reliably starts a Python worker under WSL2 but not under native
+# Windows Python 3.12 here). Install into a second, WSL2-side venv:
+#
+#   wsl.exe -d Ubuntu-22.04 -- bash -lc "cd '<repo path under /mnt/c/...>' \
+#     && python3 -m venv venv_linux \
+#     && venv_linux/bin/pip install -r requirements.txt -r requirements-spark.txt"
+#
+pyspark==4.0.1

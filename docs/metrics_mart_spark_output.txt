@@ -1,0 +1,10 @@
+WARNING: Using incubator modules: jdk.incubator.vector
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+Setting default log level to "WARN".
+To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).
+[Stage 0:>                                                          (0 + 2) / 2]                                                                                Raw per-event rows expanded from 144 slices: 121518 total events
+Spark rollup: 288 (metric, geofence, period) rows in 4.179s
+Pandas reference rollup: 288 rows in 0.020s
+Spark rollup exactly matches independent pandas reference: True
+Total event count agrees: 121518 (spark) == 121518 (pandas) == 121518 (raw rows)
