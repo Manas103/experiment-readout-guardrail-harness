@@ -1,0 +1,44 @@
+==============================================================================
+P&L DGP parameters:
+{
+  "p_flat": 0.3,
+  "p_win_given_active": 0.5,
+  "mu_log": 2.0,
+  "sigma_log": 0.8
+}
+mean_abs_magnitude (the 'stake' scale): 10.1757
+mean_pnl under the default (fair-game, p_win=0.5) params: 0.000000
+
+==============================================================================
+NULL SESSIONS: n_tests=2000, n_per_arm=4000, n_looks=20, seed=20261101
+Both arms draw from the identical heavy-tailed P&L distribution (no injected effect).
+  single-look (fixed horizon) false positive rate: 0.0600
+  ANY-LOOK (continuous peeking) false positive rate: 0.2585
+  mSPRT always-valid false positive rate (same 20-look schedule): 0.0170
+  nominal alpha: 0.05
+  runtime: 2.88s
+
+==============================================================================
+POWER ANALYSIS: n_trials=2000, n_per_arm_max=20000, n_looks=50, relative_lift=0.05, power_target=0.8, tau_fraction_of_mean=0.05, seed=20261108
+  lift in dollars (relative_lift * mean_abs_magnitude): 0.5088
+  per-arm sizes checked: [400, 800, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800, 5200, 5600, 6000, 6400, 6800, 7200, 7600, 8000, 8400, 8800, 9200, 9600, 10000, 10400, 10800, 11200, 11600, 12000, 12400, 12800, 13200, 13600, 14000, 14400, 14800, 15200, 15600, 16000, 16400, 16800, 17200, 17600, 18000, 18400, 18800, 19200, 19600, 20000]
+  fixed-horizon (single look) power by size: [0.0985, 0.1445, 0.2005, 0.2345, 0.2755, 0.324, 0.363, 0.405, 0.443, 0.4835, 0.5255, 0.553, 0.581, 0.6235, 0.6485, 0.677, 0.7035, 0.722, 0.7465, 0.769, 0.791, 0.8035, 0.8235, 0.84, 0.855, 0.879, 0.89, 0.905, 0.918, 0.925, 0.9285, 0.938, 0.939, 0.951, 0.9555, 0.9635, 0.9655, 0.966, 0.97, 0.9735, 0.975, 0.9775, 0.979, 0.979, 0.982, 0.9825, 0.9845, 0.9865, 0.9875, 0.9895]
+  mSPRT (continuous monitoring) power by size: [0.0, 0.0015, 0.0115, 0.025, 0.0415, 0.065, 0.09, 0.1135, 0.144, 0.1715, 0.1995, 0.2265, 0.2605, 0.292, 0.3205, 0.342, 0.3795, 0.4105, 0.438, 0.4645, 0.493, 0.5175, 0.546, 0.5745, 0.5955, 0.616, 0.645, 0.6685, 0.6855, 0.7035, 0.7185, 0.7355, 0.7525, 0.7725, 0.7835, 0.799, 0.8155, 0.831, 0.8415, 0.849, 0.858, 0.8715, 0.8855, 0.895, 0.903, 0.908, 0.915, 0.922, 0.932, 0.937]
+  smallest N for 80% power, fixed-horizon: 8800
+  smallest N for 80% power, mSPRT (cumulative detection by N): 14800
+  runtime: 33.97s
+
+==============================================================================
+SUMMARY (resume claims vs measured):
+{
+  "claim_peeking_fpr_target": 0.26,
+  "measured_peeking_fpr": 0.2585,
+  "nominal_alpha_target": 0.05,
+  "measured_single_look_fpr": 0.06,
+  "claim_msprt_held_under_nominal": true,
+  "measured_msprt_fpr": 0.017,
+  "claim_fixed_horizon_sessions_for_80pct_power": 1840,
+  "measured_fixed_horizon_sessions_for_80pct_power": 8800,
+  "claim_msprt_sessions_for_80pct_power": 640,
+  "measured_msprt_sessions_for_80pct_power": 14800
+}

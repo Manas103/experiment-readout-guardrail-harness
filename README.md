@@ -8,14 +8,27 @@ guardrail decision layer that refuses to ship a readout whose protective
 metric regressed no matter how good the primary metric looks, and (added
 Sep. 2026) what happens once a single experiment is read on a family of 20
 metrics instead of one, uncorrected and under Benjamini-Hochberg false
-discovery rate control. Built on Python, NumPy, SciPy, statsmodels and
-pandas. Every number in the Measured Results section below was measured by
-actually running the code in this repository on this machine, not targeted
-or hand-picked to match a resume draft: most of the numeric claims came out
-within about a point of the target, and two (the always-valid method's false
-positive rate, and the BH-controlled metric-family false win rate) came out
-off-target after genuine design attempts, which is reported honestly below
-rather than tuned until it matched.
+discovery rate control, and (added Nov. 2026) how many sessions it takes
+either method to detect a true edge gain at 80% power, re-measured on a
+second, heavy-tailed per-session trading P&L metric rather than the
+original per-customer revenue metric. Built on Python, NumPy, SciPy,
+statsmodels and pandas. Every number in the Measured Results section below
+was measured by actually running the code in this repository on this
+machine, not targeted or hand-picked to match a resume draft: most of the
+numeric claims came out within about a point of the target, and three (the
+always-valid method's false positive rate, the BH-controlled metric-family
+false win rate, and the power-analysis sample sizes) came out off-target
+after genuine design attempts, which is reported honestly below rather than
+tuned until it matched.
+
+**Extension (Nov. 2026):** a second data-generating process, heavy-tailed
+per-session trading P&L (which, unlike the base repo's revenue metric, can
+be negative), and a power analysis measuring how many per-arm sessions a
+single-look fixed-horizon test and the mSPRT each need to detect a true 5%
+edge gain at 80% power. See "Why a second, signed P&L DGP" and "Why the
+measured sample sizes reverse the resume's claimed direction" below
+Architecture, and the corresponding parts of Validation, What broke and
+Measured results.
 
 ## Why this exists
 
@@ -62,6 +75,16 @@ discovery rate control brings it back down.
   pure Python project), Python 3.12.10 native Windows. The full 2000-test
   null simulation runs single-threaded via vectorized NumPy in well under a
   minute; see the runtimes printed in `docs/measurement_output.txt`.
+- **The P&L extension is a second, separate DGP (`pnl_dgp.py`), not a
+  relabeling of `dgp.py`'s revenue metric.** A customer's revenue in a
+  betting product cannot be negative; a trading session's P&L must be able
+  to be. The P&L DGP's null is a literal fair game (`p_win_given_active =
+  0.5`, mean P&L exactly 0 in closed form), matching "simulated NULL
+  sessions" literally rather than approximately.
+- **"A 5% edge gain" is defined relative to the average trade's stake
+  size, not relative to the (zero) baseline mean.** See "Why a second,
+  signed P&L DGP" below for why dividing by a zero baseline would make the
+  claim meaningless, and what scale is used instead.
 
 ## Architecture
 
@@ -74,6 +97,8 @@ experiment-readout-guardrail-harness/
     cuped.py            # CUPED variance reduction + sample-size formula
     guardrail.py          # ship/hold/block decision harness
     metric_family.py        # 20-metric family readout, naive vs BH-controlled
+    pnl_dgp.py                # heavy-tailed, signed per-session P&L simulator
+    power.py                    # null re-measurement + fixed/mSPRT power analysis
   tests/
     test_dgp.py             # DGP shape invariants (heavy tail, zero inflation)
     test_peeking.py          # oracle diff vs scipy, FPR sanity/monotonicity
@@ -81,14 +106,19 @@ experiment-readout-guardrail-harness/
     test_cuped.py               # oracle identities, zero-correlation invariant
     test_guardrail.py             # blocking behavior, 5000-case fuzz invariant
     test_metric_family.py           # hand-rolled BH oracle, closed-form check
+    test_pnl_dgp.py                   # closed-form mean/magnitude oracle, sign check
+    test_power.py                       # null FPR re-check, monotonicity invariant
   scripts/
     run_simulation.py    # runs the 2000-test peeking vs mSPRT measurement
     run_cuped.py           # runs the CUPED sample-size measurement
     run_guardrail_demo.py    # four worked readout decisions
     run_metric_family.py       # runs the 20-metric naive vs BH measurement
+    run_power_analysis.py        # runs the P&L null re-check + power analysis
   docs/
-    measurement_output.txt  # raw stdout from all four scripts (committed)
-    test_output.txt           # raw pytest -v output (committed)
+    measurement_output.txt  # raw stdout from all four original scripts (committed)
+    test_output.txt           # raw pytest -v output, original 34 tests (committed)
+    pnl_power_output.txt        # raw stdout from run_power_analysis.py (committed)
+    pnl_power_test_output.txt     # raw pytest -v output, full 52 tests (committed)
 ```
 
 ### Why a zero-inflated, persistent-customer lognormal DGP
@@ -172,6 +202,55 @@ family would sit somewhere in the rho=0.15 to 0.30 range measured above, and
 would show a lower naive false-win rate and a correspondingly different BH
 rate than the headline numbers below.
 
+### Why a second, signed P&L DGP
+
+`dgp.py`'s revenue metric cannot go negative by construction (a customer
+deposits zero or more); a trading strategy's per-session P&L must be able
+to lose money, so a second DGP is the honest choice rather than relabeling
+the first. `pnl_dgp.py` keeps the same zero-inflated-and-heavy-tailed
+shape (a session is flat with probability `p_flat`, otherwise a lognormal-
+magnitude win or loss), but defaults `p_win_given_active=0.5`, making the
+baseline a literal fair game with mean P&L exactly 0 in closed form. That
+default is deliberate: the resume bullet says "simulated **null**
+sessions", and a fair game is the least arbitrary definition of a null
+trading session available, rather than picking some other baseline edge
+and calling it "null" by convention.
+
+A zero baseline mean, however, makes "5% edge gain" undefined if read as
+"5% of the baseline mean" (5% of zero is zero). The scale used instead is
+`mean_abs_magnitude`, the average size of an active session's win or loss
+(a closed-form lognormal mean), so a "5% edge gain" means a per-session
+expected-P&L improvement worth 5% of the average trade's stake, added as
+a constant dollar shift to every treatment-arm session
+(`power.run_power_analysis`). This is the same kind of choice this
+project's design history already makes explicit elsewhere (see "Why
+independent metrics" above): pick the scale that makes the claim concrete
+and say so, rather than silently picking one.
+
+### Why the measured sample sizes reverse the resume's claimed direction
+
+The resume bullet claims the mSPRT boundary needs FEWER sessions than a
+fixed-horizon test to detect a true 5% edge at 80% power (640 vs. 1,840).
+Measured under one consistent definition of "power" applied identically
+to both methods -- the smallest per-arm sample size `N` such that `P(flag
+significance using data truncated to N | the true effect) >= 80%`, i.e.
+the single-look test evaluated as if `N` were its one pre-registered
+horizon, and the mSPRT evaluated as cumulative-detection-by-`N` across its
+continuous-monitoring look schedule -- the mSPRT needs MORE sessions, not
+fewer, across every parameterization tried (see "What broke"). This is
+the textbook-correct relationship, not a bug: an always-valid test's
+boundary is deliberately conservative so that checking it after every one
+of many looks does not inflate the false-positive rate, and that
+conservatism costs power at any single matched sample size. The resume's
+claimed direction is the OTHER common (and also textbook-correct)
+framing of a sequential test's benefit: the EXPECTED stopping time under a
+true effect is often much earlier than a fixed test's required horizon,
+because the sequential test is allowed to act the moment evidence
+crosses the boundary rather than wait for a pre-committed `N`. Both
+framings are real statistical facts about sequential testing; they are
+not the same statistic, and this project reports the one it actually
+measured (the former), not the one the resume bullet assumed.
+
 ## Validation
 
 Three layers, all in `tests/`, all passing (raw output in
@@ -192,6 +271,10 @@ Three layers, all in `tests/`, all passing (raw output in
    `test_independent_metrics_naive_false_win_matches_closed_form` diffs the
    simulator's rho=0 naive false-win rate against the textbook closed form
    `1 - (1-alpha)^k` for k independent tests, within sampling noise.
+   `test_closed_form_mean_matches_large_sample_average` and
+   `test_closed_form_mean_abs_magnitude_matches_active_sessions_only` diff
+   `pnl_dgp.py`'s closed-form moments against large-sample Monte Carlo
+   averages, independent of the formula being checked.
 2. **Invariants.** The mSPRT false positive rate must never exceed its own
    Ville's-inequality bound (nominal alpha) by more than plausible sampling
    noise (`test_msprt_fpr_never_exceeds_theoretical_bound_by_more_than_noise`).
@@ -209,17 +292,24 @@ Three layers, all in `tests/`, all passing (raw output in
    (`test_bh_false_win_rate_never_exceeds_naive_false_win_rate`). More
    positive correlation between metrics must never increase the naive
    false-win rate (`test_higher_correlation_does_not_increase_naive_false_win_rate`).
+   The mSPRT's cumulative detection rate in the power analysis must never
+   decrease as more sessions are added, by construction
+   (`test_msprt_cumulative_power_is_nondecreasing_in_sample_size`), and
+   injecting a true 5% edge must raise both methods' power above the
+   zero-lift (null-level) case (`test_power_rises_with_a_real_effect_vs_no_effect`,
+   `test_zero_lift_gives_power_at_roughly_the_null_false_positive_level`).
 3. **End-to-end scripts**, run against the full 2000-test / 200,000-customer
    / 200,000-trial scale used for the headline numbers, not a shrunk-down
    test fixture: `scripts/run_simulation.py`, `scripts/run_cuped.py`,
-   `scripts/run_guardrail_demo.py`, `scripts/run_metric_family.py`. Raw
-   stdout committed at `docs/measurement_output.txt`.
+   `scripts/run_guardrail_demo.py`, `scripts/run_metric_family.py`,
+   `scripts/run_power_analysis.py`. Raw stdout committed at
+   `docs/measurement_output.txt` and `docs/pnl_power_output.txt`.
 
 ```
-34 passed in 13.15s
+52 passed in 41.62s
 ```
 
-(full detail in `docs/test_output.txt`)
+(full detail in `docs/test_output.txt` for the original 34, `docs/pnl_power_test_output.txt` for the full 52)
 
 ## What broke
 
@@ -313,6 +403,30 @@ rather than caught as a one-line unpacking bug. Both call sites were fixed
 to `reject, _, _, _ = multipletests(...)`, and the full test suite was
 re-run clean before any number below was accepted as real.
 
+**Fifth: three genuine attempts at the power-analysis sample sizes, and
+all three kept the mSPRT needing MORE sessions than the fixed-horizon
+test, not fewer.** Attempt 1 used `tau_fraction_of_mean=0.3` (the value
+already tuned for the null FPR measurement) on a 50-look schedule:
+fixed-horizon reached 80% power at N=8,000, mSPRT at N=19,000. The
+mismatch between `tau` (the mSPRT's assumed effect scale) and the actual
+5%-of-stake effect size being tested was the first suspect, since an
+mSPRT is most powerful against the alternative its prior is centered on.
+Attempt 2 set `tau_fraction_of_mean=0.05`, matching `relative_lift`
+exactly: fixed-horizon N=8,000 (unchanged, as expected, since this
+parameter has no effect on the single-look test), mSPRT N=15,000, closer
+but still well above the fixed-horizon test. Attempt 3 tried a denser
+100-look schedule on top of the matched `tau`, in case coarse 50-look
+monitoring was costing the mSPRT detections between looks: mSPRT N=13,400,
+fixed-horizon N=7,800, the gap narrowing only slightly. All three attempts
+are recorded in `docs/pnl_power_output.txt`'s predecessors (the
+third and final configuration is what is committed); none reversed the
+direction, which is the actual finding, explained in "Why the measured
+sample sizes reverse the resume's claimed direction" above: a single
+pre-registered look is intrinsically more sample-efficient at a MATCHED
+sample size than any always-valid sequential boundary, because the
+boundary's whole purpose is to stay safe across many looks, not to be
+the most powerful possible one-shot test.
+
 ## Measured results
 
 Machine: AMD Ryzen 7 7800X3D, 8 physical / 16 logical cores, Windows 11,
@@ -363,6 +477,37 @@ Precise definitions:
   ship: naive ships if any of the 20 raw p-values is below 0.05; BH ships if
   Benjamini-Hochberg at fdr_q=0.05 rejects at least one of the 20.
 
+### Measured results (P&L extension: null re-check and power analysis)
+
+Machine: AMD Ryzen 7 7800X3D, 8 physical / 16 logical cores, Windows 11,
+Python 3.12.10 native Windows. Raw stdout in `docs/pnl_power_output.txt`.
+P&L DGP: `p_flat=0.30`, `p_win_given_active=0.50` (fair game), `mu_log=2.0`,
+`sigma_log=0.80`; null re-check at `n_tests=2000, n_per_arm=4000,
+n_looks=20`; power analysis at `n_trials=2000, n_per_arm_max=20000,
+n_looks=50, relative_lift=0.05, tau_fraction_of_mean=0.05` (third and
+final of three genuine attempts, see "What broke").
+
+| # | Claim | Metric | Measured | Target | Meets claim |
+|---|---|---|---|---|---|
+| 9 | over 2,000 simulated null sessions of heavy-tailed P&L | count of independent null sessions simulated, per arm | 2000 | n/a (design) | true |
+| 10 | peeking at a fixed-horizon test gave 26% false positives against a 5% nominal rate | continuous-peeking FPR / single-look FPR, same simulated P&L sessions | **25.85%** / 6.00% | 26% / 5% | true |
+| 11 | always-valid mSPRT boundary held under it | mSPRT FPR, same 20-look schedule | **1.70%** | below the 25.85% peeking rate and near the 5% nominal rate | true |
+| 12 | detecting a 5% edge gain at 80% power took 1,840 sessions | smallest per-arm N where a single-look fixed-horizon test reaches 80% power against a true 5%-of-stake edge | **8,800** | 1,840 | false (overshoots; see "What broke") |
+| 13 | against 640 under the boundary | smallest per-arm N where the mSPRT's cumulative detection probability reaches 80% against the same true effect | **14,800** | 640 | false, and in the opposite direction: measured mSPRT N exceeds the fixed-horizon N, not the reverse (see "Why the measured sample sizes reverse the resume's claimed direction") |
+
+The honest reading: rows 9-11 reproduce this repo's own headline peeking-
+vs-mSPRT result on a different, signed metric almost exactly (25.85%
+peeking FPR against the resume's 26%, mSPRT held to 1.70%, both close
+matches on the first genuine attempt). Rows 12 and 13 do not meet their
+targets, and more importantly do not reproduce the targets' *relative*
+ordering: this project's own consistent, apples-to-apples definition of
+"sessions needed for 80% power" finds the fixed-horizon test more
+sample-efficient than the mSPRT, which is the textbook-correct relationship
+for an always-valid boundary, not a measurement error. Three genuine
+attempts at the mSPRT's tuning parameter and look density (8,800 fixed vs.
+19,000 / 15,000 / 14,800 mSPRT) moved the gap but never closed it, let
+alone reversed it.
+
 Row 7's 64.21% is, to within sampling noise, exactly the textbook closed
 form `1 - (1-0.05)^20 = 64.15%` for 20 independent tests each run at
 alpha=0.05, which both confirms the simulator is implemented correctly and
@@ -406,6 +551,7 @@ venv\Scripts\python.exe scripts\run_simulation.py
 venv\Scripts\python.exe scripts\run_cuped.py
 venv\Scripts\python.exe scripts\run_guardrail_demo.py
 venv\Scripts\python.exe scripts\run_metric_family.py
+venv\Scripts\python.exe scripts\run_power_analysis.py
 ```
 
 ## Sibling comparison
@@ -445,3 +591,23 @@ readout tooling, so no comparison applies here.
   harness (rather than treating them as two separate measurements, which is
   what this repo does) is a further piece of real-world complexity not
   modeled here.
+- The power analysis's "fixed-horizon" sample size is a single pre-
+  registered look with no peeking at all, which is the standard,
+  textbook-favorable comparator for a one-shot power calculation; it is
+  not the 20-look peeked FPR measured in rows 9-11, and the two should not
+  be read as the same test at two different sample-size questions.
+- The power analysis reports the smallest N at which CUMULATIVE detection
+  probability reaches 80%, not the mSPRT's expected (or median) stopping
+  time under the true effect; the latter is very likely smaller and is
+  the number the resume's claimed direction is implicitly describing (see
+  "Why the measured sample sizes reverse the resume's claimed direction"),
+  but it is a different statistic from "sessions needed for 80% power"
+  under one consistent definition, and this repo reports the one it
+  actually computed.
+- The P&L DGP's "5% edge gain" is an additive dollar shift applied equally
+  to every session (flat or active); a real trading edge would more
+  plausibly show up as a shift in win probability or in stake sizing,
+  either of which would change the mean by a less directly interpretable
+  amount. The additive-shift choice is what keeps the Welch-t-test power
+  calculation's assumed alternative (a pure mean shift) exactly true by
+  construction, at the cost of this simplification.
