@@ -1,0 +1,96 @@
+==============================================================================
+SRM GATE: chi-squared sample-ratio-mismatch check, p < 0.0005
+30 seeded assignment/logging defects across 4 named root causes
+
+[attempt] severity set 1 (first genuine magnitude design)
+  caught: 11 of 30
+    assignment_bucketing: 3 of 8
+    log_join_loss: 0 of 7
+    variant_triggered_dropout: 2 of 7
+    uneven_ramp: 6 of 8
+
+[attempt] severity set 2 (raised magnitudes across all 4 types)
+  caught: 17 of 30
+    assignment_bucketing: 3 of 8
+    log_join_loss: 2 of 7
+    variant_triggered_dropout: 5 of 7
+    uneven_ramp: 7 of 8
+
+[attempt] severity set 3 / final (raised again; reported below)
+  caught: 19 of 30
+    assignment_bucketing: 4 of 8
+    log_join_loss: 2 of 7
+    variant_triggered_dropout: 5 of 7
+    uneven_ramp: 8 of 8
+
+==============================================================================
+FINAL DESIGN: severity='final'
+
+Seeded defects caught: 19 of 30
+Per-case detail:
+  bucketing_0          n_control= 2488 n_treatment= 2512 chi2=    0.115 p=0.7343 caught=False
+  bucketing_1          n_control= 2430 n_treatment= 2570 chi2=    3.920 p=0.0477149 caught=False
+  bucketing_2          n_control= 2422 n_treatment= 2578 chi2=    4.867 p=0.0273719 caught=False
+  bucketing_3          n_control= 2414 n_treatment= 2586 chi2=    5.917 p=0.0149972 caught=False
+  bucketing_4          n_control= 2337 n_treatment= 2663 chi2=   21.255 p=4.02018e-06 caught=True
+  bucketing_5          n_control= 2251 n_treatment= 2749 chi2=   49.601 p=1.88437e-12 caught=True
+  bucketing_6          n_control= 2177 n_treatment= 2823 chi2=   83.463 p=6.49132e-20 caught=True
+  bucketing_7          n_control= 2103 n_treatment= 2897 chi2=  126.087 p=2.94265e-29 caught=True
+  log_join_loss_0      n_control= 2499 n_treatment= 2444 chi2=    0.612 p=0.434045 caught=False
+  log_join_loss_1      n_control= 2514 n_treatment= 2404 chi2=    2.460 p=0.116753 caught=False
+  log_join_loss_2      n_control= 2488 n_treatment= 2395 chi2=    1.771 p=0.183228 caught=False
+  log_join_loss_3      n_control= 2509 n_treatment= 2302 chi2=    8.906 p=0.00284163 caught=False
+  log_join_loss_4      n_control= 2451 n_treatment= 2307 chi2=    4.358 p=0.0368326 caught=False
+  log_join_loss_5      n_control= 2507 n_treatment= 2144 chi2=   28.331 p=1.02228e-07 caught=True
+  log_join_loss_6      n_control= 2492 n_treatment= 2055 chi2=   41.999 p=9.13248e-11 caught=True
+  dropout_0            n_control= 2501 n_treatment= 2326 chi2=    6.345 p=0.0117744 caught=False
+  dropout_1            n_control= 2426 n_treatment= 2293 chi2=    3.748 p=0.0528561 caught=False
+  dropout_2            n_control= 2510 n_treatment= 2104 chi2=   35.725 p=2.27208e-09 caught=True
+  dropout_3            n_control= 2476 n_treatment= 2009 chi2=   48.626 p=3.09687e-12 caught=True
+  dropout_4            n_control= 2407 n_treatment= 1895 chi2=   60.935 p=5.89793e-15 caught=True
+  dropout_5            n_control= 2487 n_treatment= 1586 chi2=  199.313 p=2.94983e-45 caught=True
+  dropout_6            n_control= 2525 n_treatment= 1312 chi2=  383.469 p=2.18677e-85 caught=True
+  ramp_0               n_control= 2639 n_treatment= 2361 chi2=   15.457 p=8.44127e-05 caught=True
+  ramp_1               n_control= 2772 n_treatment= 2228 chi2=   59.187 p=1.43363e-14 caught=True
+  ramp_2               n_control= 2833 n_treatment= 2167 chi2=   88.711 p=4.56871e-21 caught=True
+  ramp_3               n_control= 2909 n_treatment= 2091 chi2=  133.825 p=5.96759e-31 caught=True
+  ramp_4               n_control= 2256 n_treatment= 2744 chi2=   47.629 p=5.15062e-12 caught=True
+  ramp_5               n_control= 2199 n_treatment= 2801 chi2=   72.481 p=1.68665e-17 caught=True
+  ramp_6               n_control= 2188 n_treatment= 2812 chi2=   77.875 p=1.09761e-18 caught=True
+  ramp_7               n_control= 2068 n_treatment= 2932 chi2=  149.299 p=2.46684e-34 caught=True
+
+Clean splits (no defect): 0 false alarms of 40
+clean p-values: [0.0544, 0.2462, 0.9324, 0.7131, 0.3961, 0.6306, 0.1339, 0.3086, 0.1658, 0.2349, 0.3086, 0.4284, 0.3222, 0.6921, 0.4795, 0.4795, 0.8652, 0.2239, 0.7773, 0.3222, 0.4451, 0.4451, 0.3362, 0.6714, 0.6921, 0.7991, 0.0101, 0.6107, 0.3362, 0.6107, 0.7343, 0.7773, 0.8652, 0.3362, 0.591, 0.7557, 0.0581, 0.003, 0.8431, 0.5153]
+
+==============================================================================
+SUMMARY (resume claims vs measured):
+{
+  "claim_seeded_defects_caught_target": "28 of 30",
+  "measured_seeded_defects_caught": "19 of 30",
+  "by_defect_type": {
+    "assignment_bucketing": [
+      4,
+      8
+    ],
+    "log_join_loss": [
+      2,
+      7
+    ],
+    "variant_triggered_dropout": [
+      5,
+      7
+    ],
+    "uneven_ramp": [
+      8,
+      8
+    ]
+  },
+  "clean_false_alarm_rate": 0.0,
+  "attempts_tried": [
+    "attempt1",
+    "attempt2",
+    "final"
+  ],
+  "n_developers": 5000,
+  "threshold": 0.0005
+}
